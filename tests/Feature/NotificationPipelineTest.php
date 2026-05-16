@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendMessageJob;
+use App\Models\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
@@ -96,10 +98,12 @@ class NotificationPipelineTest extends TestCase
 
     public function test_rabbitmq_retry_mechanism_on_gateway_failure()
     {
+        //Шлюз должен вернуть 500
         Http::fake(['*test.local*' => Http::response(['error' => 'Gateway Dead'], 500)]);
 
         $randomPhone = '+79997776655';
 
+        //Ставим задачу в очередь
         $this->postJson('/api/notifications/send', [
             'channel' => 'sms',
             'message' => 'Retry testing',
@@ -107,16 +111,37 @@ class NotificationPipelineTest extends TestCase
             'priority' => 'default'
         ], ['X-Idempotency-Key' => fake()->uuid()]);
 
+        //Запускаем очередь. Выполняет запрос и получает 500
         $this->artisan('queue:work', [
             'connection' => 'rabbitmq',
             '--once' => true,
             '--queue' => 'testing_default'
         ]);
 
+        //Запись должна остаться в статусе запланирована
         $this->assertDatabaseHas('notifications', [
             'recipient_id' => $randomPhone,
             'status' => 'queued'
         ]);
     }
 
+    public function test_worker_ensures_exactly_once_delivery()
+    {
+        Http::fake(['*test.ru*' => Http::response(['status' => 'success'], 200)]);
+
+        //создаем уже отправленное по статусу уведомление
+        $notification = Notification::create([
+            'batch_id' => fake()->uuid(),
+            'recipient_id' => '+79990001122',
+            'channel' => 'sms',
+            'message' => 'Exactly-once test',
+            'status' => 'sent'
+        ]);
+
+        $job = new SendMessageJob($notification);
+        $job->handle(); //обрабатываем джоб
+
+        //проверяем,что не пытался отправить повторно
+        Http::assertNothingSent();
+    }
 }

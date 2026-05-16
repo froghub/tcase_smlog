@@ -1,0 +1,102 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  description: Массовая рассылка уведомлений
+  version: 1.0.0
+servers:
+  - url: http://localhost/api/
+paths:
+  /notifications/send:
+    post:
+      summary: Запуск массовой рассылки
+      description: Принимает массив получателей, ставит задачи в RabbitMQ с учетом приоритета.
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Уникальный ключ запроса для защиты от дублирования.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, message, recipients]
+              properties:
+                channel:
+                  type: string
+                  enum: [sms, email]
+                message:
+                  type: string
+                  example: "Ваш код доступа: 4432"
+                priority:
+                  type: string
+                  enum: [high, default]
+                  default: default
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                  example: ["+79991112233", "user@example.com"]
+      responses:
+        '202':
+          description: Запрос принят в очередь
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batch_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: "accepted"
+        '409':
+          description: Дубликат запроса (Idempotency Lock)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Duplicate request detected."
+
+  /notifications/recipient/{id}:
+    get:
+      summary: История и статусы подписчика
+      description: Возвращает детализацию по всем сообщениям конкретного получателя.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор получателя (номер телефона или email).
+      responses:
+        '200':
+          description: Успешный ответ со списком уведомлений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    batch_id:
+                      type: string
+                    recipient_id:
+                      type: string
+                    channel:
+                      type: string
+                    message:
+                      type: string
+                    status:
+                      type: string
+                      enum: [queued, sent, delivered, failed]
