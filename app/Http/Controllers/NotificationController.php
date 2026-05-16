@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\NotificationSendRequest;
 use App\Jobs\SendMessageJob;
 use App\Models\Notification;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -15,7 +14,7 @@ class NotificationController extends Controller
     public function send(NotificationSendRequest $request)
     {
         $idempotencyKey = $request->header('X-Idempotency-Key');
-        if ($idempotencyKey && !Cache::lock('idempotency:'.$idempotencyKey, 60)->get()) {
+        if ($idempotencyKey && !Cache::lock('idempotency:' . $idempotencyKey, 60)->get()) {
             return response()->json(['error' => 'Duplicate request detected.'], 409);
         }
 
@@ -34,7 +33,6 @@ class NotificationController extends Controller
                 'status' => 'queued'
             ]);
 
-//            $jobs[] = (new SendMessageJob($notification))->onQueue($priority);
             $jobs[] = new SendMessageJob($notification);
         }
 

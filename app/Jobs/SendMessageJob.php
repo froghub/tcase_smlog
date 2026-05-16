@@ -16,8 +16,7 @@ class SendMessageJob implements ShouldQueue
     use Queueable, Batchable, Dispatchable, InteractsWithQueue, SerializesModels;
 
     public int $tries = 3;
-    public int $backoff = 60;
-    public int $errorChance = 10;
+    public int $backoff = 5;
 
     /**
      * Create a new job instance.
@@ -35,15 +34,6 @@ class SendMessageJob implements ShouldQueue
         if ($this->batch()?->cancelled()) {
             return;
         }
-        //Подменяем запрос и передачу данных на имитацию с небольшим шансом фейла
-//        $response = Http::fake([
-//            'test.local' => function () {
-//                if (rand(1, 100) <= $this->errorChance) {
-//                    return Http::response(['error' => 'Server Error'], 500);
-//                }
-//                return Http::response(['status' => 'success', 'data' => []], 200);
-//            },
-//        ]);
 
         $response = Http::post('test.ru', [
             'type' => $this->notification->channel,
