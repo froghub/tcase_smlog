@@ -11,7 +11,12 @@ RABBITMQ_HOST=rabbitmq
 RABBITMQ_PORT=5672  
 RABBITMQ_USER=guest  
 RABBITMQ_PASSWORD=guest  
-
+DB_CONNECTION=pgsql  
+DB_HOST=pgsql  
+DB_PORT=5432  
+DB_DATABASE=laravel  
+DB_USERNAME=sail  
+DB_PASSWORD=password  
 
 ### Зависимости и запуск:
 
